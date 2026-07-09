@@ -1,11 +1,17 @@
 name: Publish release
-# タグ v* を push すると、リポジトリ同梱の SolarForge-<version>.rbz を
-# アセットに付けた GitHub Release を作成する。自動アップデータ(update.rb)は
-# releases/latest の .rbz アセットを参照するため、Release 化が必須。
+# Release を作成し、同梱の SolarForge-<version>.rbz をアセットに付ける。
+# 自動アップデータ(update.rb)は releases/latest の .rbz を参照するため Release 化が必須。
+# 手動実行(workflow_dispatch)ではCIトークンがタグ v<version> も同時に作成する。
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'version without v (例: 0.3.1)'
+        required: true
+        default: '0.3.1'
 permissions:
   contents: write
 jobs:
@@ -18,11 +24,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="v${VERSION}"
+            EXTRA="--target ${GITHUB_SHA}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+            VERSION="${TAG#v}"
+            EXTRA=""
+          fi
           FILE="SolarForge-${VERSION}.rbz"
           if [ ! -f "$FILE" ]; then
             echo "::error::asset $FILE not found at repo root"; ls -la; exit 1
           fi
-          gh release create "${GITHUB_REF_NAME}" "$FILE" \
-            --title "SolarForge ${GITHUB_REF_NAME}" \
-            --notes "縦置き(portrait)配置の重なりを修正。屋根/傾斜架台のパネルが縦置き選択時に重なる不具合を根治(横置きは無改変)。導入は本rbzをSketchUp拡張機能マネージャで上書き→再起動、またはプラグイン内「⬆更新」から。"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists — uploading/overwriting asset"
+            gh release upload "$TAG" "$FILE" --clobber
+          else
+            gh release create "$TAG" "$FILE" $EXTRA \
+              --title "SolarForge ${TAG}" \
+              --notes "縦置き(portrait)配置の重なりを修正。屋根/傾斜架台のパネルが縦置き選択時に重なる不具合を根治(横置きは無改変)。導入=本rbzをSketchUp拡張機能マネージャで上書き→再起動、またはプラグイン内「⬆更新」から。"
+          fi
