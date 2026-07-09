@@ -1,0 +1,28 @@
+name: Publish release
+# タグ v* を push すると、リポジトリ同梱の SolarForge-<version>.rbz を
+# アセットに付けた GitHub Release を作成する。自動アップデータ(update.rb)は
+# releases/latest の .rbz アセットを参照するため、Release 化が必須。
+on:
+  push:
+    tags:
+      - 'v*'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create release with rbz asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          FILE="SolarForge-${VERSION}.rbz"
+          if [ ! -f "$FILE" ]; then
+            echo "::error::asset $FILE not found at repo root"; ls -la; exit 1
+          fi
+          gh release create "${GITHUB_REF_NAME}" "$FILE" \
+            --title "SolarForge ${GITHUB_REF_NAME}" \
+            --notes "縦置き(portrait)配置の重なりを修正。屋根/傾斜架台のパネルが縦置き選択時に重なる不具合を根治(横置きは無改変)。導入は本rbzをSketchUp拡張機能マネージャで上書き→再起動、またはプラグイン内「⬆更新」から。"
