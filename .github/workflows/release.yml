@@ -37,11 +37,13 @@ jobs:
           if [ ! -f "$FILE" ]; then
             echo "::error::asset $FILE not found at repo root"; ls -la; exit 1
           fi
+          # ノートはリポジトリ同梱の RELEASE_NOTES.md を使う(v0.3.3〜。無ければ汎用文)
+          if [ -f RELEASE_NOTES.md ]; then NOTES_ARGS="--notes-file RELEASE_NOTES.md"; else NOTES_ARGS="--notes 導入=本rbzをSketchUp拡張機能マネージャで上書き→再起動、またはプラグイン内「⬆更新」から。"; fi
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "release $TAG already exists — uploading/overwriting asset"
+            echo "release $TAG already exists — updating asset and notes"
             gh release upload "$TAG" "$FILE" --clobber
+            gh release edit "$TAG" --title "SolarForge ${TAG}" $NOTES_ARGS
           else
             gh release create "$TAG" "$FILE" $EXTRA \
-              --title "SolarForge ${TAG}" \
-              --notes "縦置き(portrait)配置の重なりを修正。屋根/傾斜架台のパネルが縦置き選択時に重なる不具合を根治(横置きは無改変)。導入=本rbzをSketchUp拡張機能マネージャで上書き→再起動、またはプラグイン内「⬆更新」から。"
+              --title "SolarForge ${TAG}" $NOTES_ARGS
           fi
